@@ -3,11 +3,13 @@ import { publicSettings } from '../../lib/settings.js';
 
 export const prerender = false;
 
-export async function GET() {
-  return json({ donations: getDonations() });
+export async function GET({ locals }) {
+  const env = locals.runtime.env;
+  return json({ donations: await getDonations(env) });
 }
 
-export async function POST({ request }) {
+export async function POST({ request, locals }) {
+  const env = locals.runtime.env;
   let body;
   try {
     body = await request.json();
@@ -20,9 +22,8 @@ export async function POST({ request }) {
   if (!name) return json({ error: 'देणगीदाराचे नाव आवश्यक आहे (name required)' }, 422);
   if (!total || total <= 0) return json({ error: 'वैध एकूण रक्कम आवश्यक आहे (valid total amount required)' }, 422);
 
-  const record = addDonation(body);
-  // Return the saved record plus mandal settings so the client can build the receipt.
-  return json({ ok: true, donation: record, settings: publicSettings() });
+  const record = await addDonation(env, body);
+  return json({ ok: true, donation: record, settings: await publicSettings(env) });
 }
 
 function json(data, status = 200) {

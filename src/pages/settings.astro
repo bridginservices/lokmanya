@@ -1,7 +1,7 @@
 ---
 import AdminLayout from '../layouts/AdminLayout.astro';
 import { publicSettings } from '../lib/settings.js';
-const s = publicSettings();
+const s = await publicSettings(Astro.locals.runtime.env);
 ---
 <AdminLayout title="सेटिंग्ज" active="settings" subtitle="Settings · मंडळाची माहिती व पावती तपशील">
   <form id="settingsForm" class="card" style="max-width:860px">

@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css';
 import { publicSettings } from '../lib/settings.js';
-const settings = publicSettings();
+const settings = await publicSettings(Astro.locals.runtime.env);
 ---
 <!doctype html>
 <html lang="mr">

@@ -1,12 +1,7 @@
-import fs from 'node:fs';
 import * as XLSX from 'xlsx';
-import { PATHS, ensureDataDir } from './paths.js';
 import { getSettings } from './settings.js';
 
-// SheetJS ESM build has no bundled filesystem access — bind Node's fs so
-// XLSX.readFile / writeFile work.
-XLSX.set_fs(fs);
-
+const DONATIONS_KEY = 'donations.xlsx';
 const SHEET_NAME = 'Donations';
 
 // Column order used in the .xlsx file (headers are Marathi-friendly labels).
@@ -44,12 +39,11 @@ function migrateLegacy(rec) {
   return rec;
 }
 
-function readWorkbook() {
-  ensureDataDir();
-  if (!fs.existsSync(PATHS.donations)) {
-    return [];
-  }
-  const wb = XLSX.readFile(PATHS.donations);
+async function readWorkbook(env) {
+  const obj = await env.DATA.get(DONATIONS_KEY);
+  if (!obj) return [];
+  const buf = new Uint8Array(await obj.arrayBuffer());
+  const wb = XLSX.read(buf, { type: 'array' });
   const ws = wb.Sheets[SHEET_NAME] || wb.Sheets[wb.SheetNames[0]];
   if (!ws) return [];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -63,14 +57,12 @@ function readWorkbook() {
   });
 }
 
-function writeWorkbook(records) {
-  ensureDataDir();
+function buildWorkbookBytes(records) {
   const aoa = [COLUMNS.map(([, h]) => h)];
   for (const r of records) {
     aoa.push(COLUMNS.map(([k]) => (r[k] ?? '')));
   }
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  // Reasonable column widths for readability.
   ws['!cols'] = [
     { wch: 18 }, { wch: 12 }, { wch: 24 }, { wch: 14 }, { wch: 14 },
     { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 18 },
@@ -78,7 +70,11 @@ function writeWorkbook(records) {
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, SHEET_NAME);
-  XLSX.writeFile(wb, PATHS.donations);
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+}
+
+async function writeWorkbook(env, records) {
+  await env.DATA.put(DONATIONS_KEY, buildWorkbookBytes(records));
 }
 
 // Payment status derived from total vs paid.
@@ -106,22 +102,22 @@ function money(totalRaw, paidRaw, { paidDefaultsToTotal = true } = {}) {
   };
 }
 
-export function getDonations() {
-  const rows = readWorkbook();
-  // Newest first for display.
-  return rows.slice().reverse();
+export async function getDonations(env) {
+  const rows = await readWorkbook(env);
+  return rows.slice().reverse(); // newest first
 }
 
-export function getAllDonationsRaw() {
-  return readWorkbook();
+export async function getAllDonationsRaw(env) {
+  return readWorkbook(env);
 }
 
-export function getDonation(receiptNo) {
-  return readWorkbook().find((r) => String(r.receiptNo) === String(receiptNo)) || null;
+export async function getDonation(env, receiptNo) {
+  const rows = await readWorkbook(env);
+  return rows.find((r) => String(r.receiptNo) === String(receiptNo)) || null;
 }
 
-function nextReceiptNumber(existing) {
-  const settings = getSettings();
+async function nextReceiptNumber(env, existing) {
+  const settings = await getSettings(env);
   const prefix = settings.receiptPrefix || 'LBGUM';
   const year = new Date().getFullYear();
   const tag = `${prefix}-${year}-`;
@@ -136,10 +132,9 @@ function nextReceiptNumber(existing) {
   return `${tag}${String(max + 1).padStart(4, '0')}`;
 }
 
-export function addDonation(input) {
-  const records = readWorkbook();
-  const receiptNo = nextReceiptNumber(records);
-  // Accept `totalAmount` (new) or `amount` (legacy) for the pledged total.
+export async function addDonation(env, input) {
+  const records = await readWorkbook(env);
+  const receiptNo = await nextReceiptNumber(env, records);
   const m = money(input.totalAmount ?? input.amount, input.paidAmount);
   const record = {
     receiptNo,
@@ -154,12 +149,12 @@ export function addDonation(input) {
     createdAt: new Date().toISOString(),
   };
   records.push(record);
-  writeWorkbook(records);
+  await writeWorkbook(env, records);
   return record;
 }
 
-export function updateDonation(receiptNo, input) {
-  const records = readWorkbook();
+export async function updateDonation(env, receiptNo, input) {
+  const records = await readWorkbook(env);
   const idx = records.findIndex((r) => String(r.receiptNo) === String(receiptNo));
   if (idx === -1) return null;
   const cur = records[idx];
@@ -181,42 +176,35 @@ export function updateDonation(receiptNo, input) {
     updatedAt: new Date().toISOString(),
   };
   records[idx] = updated;
-  writeWorkbook(records);
+  await writeWorkbook(env, records);
   return updated;
 }
 
-export function deleteDonation(receiptNo) {
-  const records = readWorkbook();
+export async function deleteDonation(env, receiptNo) {
+  const records = await readWorkbook(env);
   const idx = records.findIndex((r) => String(r.receiptNo) === String(receiptNo));
   if (idx === -1) return false;
   records.splice(idx, 1);
-  writeWorkbook(records);
+  await writeWorkbook(env, records);
   return true;
 }
 
 // --- Stats helpers -------------------------------------------------------
-
 function isToday(dateStr) {
   const today = new Date().toISOString().slice(0, 10);
   return String(dateStr).slice(0, 10) === today;
 }
-
 function isThisMonth(dateStr) {
   const now = new Date();
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   return String(dateStr).slice(0, 7) === ym;
 }
 
-export function getStats() {
-  const rows = readWorkbook();
-  let todayTotal = 0;
-  let monthTotal = 0;
-  let total = 0;
-  let outstanding = 0;
-  let todayCount = 0;
+export async function getStats(env) {
+  const rows = await readWorkbook(env);
+  let todayTotal = 0, monthTotal = 0, total = 0, outstanding = 0, todayCount = 0;
   const donors = new Set();
   for (const r of rows) {
-    // Collection figures are based on money actually received (paid).
     const paid = Number(r.paidAmount) || 0;
     const bal = Number(r.balance) || 0;
     total += paid;
@@ -227,26 +215,14 @@ export function getStats() {
   }
   donors.delete('');
   return {
-    todayTotal,
-    monthTotal,
-    total,
-    outstanding,
-    todayCount,
-    count: rows.length,
-    donorCount: donors.size,
+    todayTotal, monthTotal, total, outstanding, todayCount,
+    count: rows.length, donorCount: donors.size,
   };
 }
 
-export function getWorkbookBuffer() {
-  ensureDataDir();
-  const records = readWorkbook();
-  if (records.length === 0) {
-    // Return an empty-but-valid workbook with headers.
-    const ws = XLSX.utils.aoa_to_sheet([COLUMNS.map(([, h]) => h)]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, SHEET_NAME);
-    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  }
-  const wb = XLSX.readFile(PATHS.donations);
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+export async function getWorkbookBuffer(env) {
+  const obj = await env.DATA.get(DONATIONS_KEY);
+  if (obj) return await obj.arrayBuffer();
+  // Empty-but-valid workbook with just the headers.
+  return buildWorkbookBytes([]);
 }

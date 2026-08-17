@@ -3,10 +3,11 @@ import AdminLayout from '../layouts/AdminLayout.astro';
 import { getStats, getDonations } from '../lib/store.js';
 import { publicSettings } from '../lib/settings.js';
 
-const stats = getStats();
-const donations = getDonations();
+const env = Astro.locals.runtime.env;
+const stats = await getStats(env);
+const donations = await getDonations(env);
 const recent = donations.slice(0, 8);
-const settings = publicSettings();
+const settings = await publicSettings(env);
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const payClass = (m) => (m === 'UPI' ? 'upi' : m === 'Bank Transfer' ? 'bank' : 'cash');

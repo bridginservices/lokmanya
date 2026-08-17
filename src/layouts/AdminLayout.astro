@@ -3,7 +3,7 @@ import '../styles/global.css';
 import { publicSettings } from '../lib/settings.js';
 
 const { title = 'डॅशबोर्ड', active = 'home', subtitle = '' } = Astro.props;
-const settings = publicSettings();
+const settings = await publicSettings(Astro.locals.runtime.env);
 
 const nav = [
   { key: 'home', href: '/', ic: '🏠', label: 'डॅशबोर्ड', sub: 'Dashboard' },

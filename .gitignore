@@ -13,3 +13,7 @@ data/
 *.log
 .env
 .DS_Store
+
+# cloudflare / wrangler
+.dev.vars
+.wrangler/

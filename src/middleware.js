@@ -1,13 +1,13 @@
-import { verifySession, SESSION_COOKIE } from './lib/auth.js';
+import { verifySession, getSecret, SESSION_COOKIE } from './lib/auth.js';
 
 // Paths that do not require authentication.
 const PUBLIC = ['/login', '/api/login'];
 
-export function onRequest(context, next) {
-  const { url, cookies, redirect } = context;
+export async function onRequest(context, next) {
+  const { url, cookies, redirect, locals } = context;
   const pathname = url.pathname;
+  const env = locals.runtime?.env || {};
 
-  // Static-ish assets and public routes pass through.
   const isPublic =
     PUBLIC.includes(pathname) ||
     pathname.startsWith('/_') ||
@@ -15,11 +15,10 @@ export function onRequest(context, next) {
     pathname.startsWith('/uploads');
 
   const token = cookies.get(SESSION_COOKIE)?.value;
-  const session = verifySession(token);
-  context.locals.session = session;
+  const session = await verifySession(getSecret(env), token);
+  locals.session = session;
 
   if (isPublic) {
-    // Already logged in? Skip the login screen.
     if (pathname === '/login' && session) return redirect('/');
     return next();
   }

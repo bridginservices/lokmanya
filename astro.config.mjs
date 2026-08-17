@@ -1,17 +1,19 @@
 import { defineConfig } from 'astro/config';
-import node from '@astrojs/node';
+import cloudflare from '@astrojs/cloudflare';
 
-// SSR app — data is stored on disk (xlsx + settings.json), so we need a server.
+// Serverless app on Cloudflare Workers.
+// Data (donations.xlsx, settings.json, logo) is stored in Cloudflare R2,
+// accessed via the `DATA` binding on `Astro.locals.runtime.env`.
 export default defineConfig({
   output: 'server',
-  adapter: node({ mode: 'standalone' }),
-  server: {
-    host: true,
-    // Honor a port assigned via the PORT env var (e.g. preview harness).
-    port: process.env.PORT ? Number(process.env.PORT) : 4321,
-  },
+  adapter: cloudflare({
+    // Expose R2/vars bindings to `astro dev` via a local (Miniflare) emulation.
+    platformProxy: { enabled: true },
+    // We don't use Astro's <Image>; skip the sharp-based service on the worker.
+    imageService: 'passthrough',
+  }),
   vite: {
-    // xlsx ships as CJS; make sure it is optimized/bundled correctly.
+    // xlsx (SheetJS) must be bundled into the worker.
     ssr: {
       noExternal: ['xlsx'],
     },

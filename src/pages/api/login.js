@@ -1,9 +1,10 @@
 import { getSettings, verifyPassword } from '../../lib/settings.js';
-import { createSession, SESSION_COOKIE, sessionCookieOptions } from '../../lib/auth.js';
+import { createSession, getSecret, SESSION_COOKIE, sessionCookieOptions } from '../../lib/auth.js';
 
 export const prerender = false;
 
-export async function POST({ request, cookies }) {
+export async function POST({ request, cookies, locals }) {
+  const env = locals.runtime.env;
   let body;
   try {
     body = await request.json();
@@ -11,16 +12,18 @@ export async function POST({ request, cookies }) {
     return json({ error: 'bad request' }, 400);
   }
   const { user, password } = body || {};
-  const settings = getSettings();
+  const settings = await getSettings(env);
 
   const okUser = String(user || '').trim().toLowerCase() === String(settings.adminUser).toLowerCase();
-  const okPass = verifyPassword(String(password || ''), settings.adminHash);
+  const okPass = await verifyPassword(String(password || ''), settings.adminHash);
 
   if (!okUser || !okPass) {
     return json({ error: 'invalid credentials' }, 401);
   }
 
-  cookies.set(SESSION_COOKIE, createSession(settings.adminUser), sessionCookieOptions());
+  const token = await createSession(getSecret(env), settings.adminUser);
+  const secure = new URL(request.url).protocol === 'https:';
+  cookies.set(SESSION_COOKIE, token, sessionCookieOptions(secure));
   return json({ ok: true });
 }
 

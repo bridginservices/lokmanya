@@ -1,0 +1,14 @@
+name = "lokmanya"
+pages_build_output_dir = "./dist"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# R2 bucket that holds donations.xlsx, settings.json and the uploaded logo.
+# Create it once with:  wrangler r2 bucket create lokmanya-data
+[[r2_buckets]]
+binding = "DATA"
+bucket_name = "lokmanya-data"
+
+# SESSION_SECRET is a secret, not a plain var. Set it for production with:
+#   wrangler pages secret put SESSION_SECRET
+# For local dev (`npm run dev`) it is read from .dev.vars instead.

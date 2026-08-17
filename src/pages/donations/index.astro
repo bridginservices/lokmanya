@@ -3,8 +3,9 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getDonations } from '../../lib/store.js';
 import { publicSettings } from '../../lib/settings.js';
 
-const donations = getDonations();
-const settings = publicSettings();
+const env = Astro.locals.runtime.env;
+const donations = await getDonations(env);
+const settings = await publicSettings(env);
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const payClass = (m) => (m === 'UPI' ? 'upi' : m === 'Bank Transfer' ? 'bank' : 'cash');
 const payMr = { Cash: 'रोख', UPI: 'यूपीआय', 'Bank Transfer': 'बँक' };

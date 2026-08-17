@@ -2,7 +2,7 @@
 import AdminLayout from '../layouts/AdminLayout.astro';
 import { getStats } from '../lib/store.js';
 
-const stats = getStats();
+const stats = await getStats(Astro.locals.runtime.env);
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 ---
 <AdminLayout title="अहवाल" active="reports" subtitle="Reports · संकलनाचा सारांश">
