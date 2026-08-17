@@ -1,0 +1,165 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getDonations } from '../../lib/store.js';
+import { publicSettings } from '../../lib/settings.js';
+
+const donations = getDonations();
+const settings = publicSettings();
+const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
+const payClass = (m) => (m === 'UPI' ? 'upi' : m === 'Bank Transfer' ? 'bank' : 'cash');
+const payMr = { Cash: 'रोख', UPI: 'यूपीआय', 'Bank Transfer': 'बँक' };
+const statusClass = (s) => (s === 'Paid' ? 'paid' : s === 'Partial' ? 'partial' : 'pending');
+const statusMr = { Paid: 'पूर्ण', Partial: 'अंशतः', Pending: 'बाकी' };
+const fmtDate = (d) => { try { return new Date(d).toLocaleDateString('en-GB'); } catch { return d; } };
+
+// Money received (paid) vs money pending (balance), for the summary + filters.
+const bucketOf = (d) => (Number(d.balance) > 0 ? 'pending' : 'received');
+let totalReceived = 0, totalPending = 0, receivedCount = 0, pendingCount = 0;
+for (const d of donations) {
+  totalReceived += Number(d.paidAmount) || 0;
+  totalPending += Number(d.balance) || 0;
+  if (bucketOf(d) === 'pending') pendingCount++; else receivedCount++;
+}
+---
+<AdminLayout title="देणग्या" active="donations" subtitle={`Donations · एकूण ${donations.length} नोंदी`}>
+  <div slot="topbar-actions" class="pill-row">
+    <a class="btn btn-ghost" href="/api/export">📥 Excel</a>
+    <a class="btn btn-primary" href="/donations/new">➕ नवीन</a>
+  </div>
+
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:16px">
+    <div class="summary-chip received">
+      <div class="lbl">💰 एकूण जमा रक्कम (Money Received)</div>
+      <div class="amt">{inr(totalReceived)}</div>
+      <div class="sub">{receivedCount} देणग्या पूर्ण जमा</div>
+    </div>
+    <div class="summary-chip pending">
+      <div class="lbl">⏳ एकूण बाकी रक्कम (Money Pending)</div>
+      <div class="amt">{inr(totalPending)}</div>
+      <div class="sub">{pendingCount} देणग्यांची रक्कम बाकी</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="filter-bar">
+      <div class="filter-tabs" id="filterTabs">
+        <button class="filter-tab active" data-filter="all">सर्व (All) <b>{donations.length}</b></button>
+        <button class="filter-tab" data-filter="received">💰 पैसे जमा (Received) <b>{receivedCount}</b></button>
+        <button class="filter-tab" data-filter="pending">⏳ पैसे बाकी (Pending) <b>{pendingCount}</b></button>
+      </div>
+      <input id="search" placeholder="🔍 नाव, मोबाईल किंवा पावती क्र. शोधा..." />
+    </div>
+    <div class="card-head" style="margin-bottom:8px">
+      <span class="hint" id="count">{donations.length} नोंदी</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data" id="tbl">
+        <thead>
+          <tr>
+            <th>पावती क्र.</th><th>नाव</th><th>मोबाईल</th>
+            <th>एकूण</th><th>भरले</th><th>बाकी</th><th>स्थिती</th>
+            <th>पद्धत</th><th>दिनांक</th><th>क्रिया</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          {donations.length === 0 && (
+            <tr><td colspan="10" class="empty">अजून कोणतीही देणगी नाही. <a href="/donations/new">पहिली देणगी जोडा →</a></td></tr>
+          )}
+          {donations.map((d, i) => (
+            <tr data-search={`${d.receiptNo} ${d.name} ${d.mobile}`.toLowerCase()} data-receipt={d.receiptNo} data-bucket={bucketOf(d)}>
+              <td><b>{d.receiptNo}</b></td>
+              <td class="mr">{d.name}</td>
+              <td>{d.mobile}</td>
+              <td class="amount">{inr(d.totalAmount)}</td>
+              <td>{inr(d.paidAmount)}</td>
+              <td style={Number(d.balance) > 0 ? 'color:#c1121f;font-weight:700' : ''}>{inr(d.balance)}</td>
+              <td><span class={'badge ' + statusClass(d.status)}>{statusMr[d.status] || d.status}</span></td>
+              <td><span class={'badge ' + payClass(d.paymentMethod)}>{payMr[d.paymentMethod] || d.paymentMethod}</span></td>
+              <td>{fmtDate(d.date)}</td>
+              <td style="white-space:nowrap">
+                <button class="icon-btn re-pdf" data-i={i} title="पावती (JPG)">🧾</button>
+                <button class="icon-btn re-wa" data-i={i} title="WhatsApp">📲</button>
+                <a class="icon-btn" href={`/donations/edit/${d.receiptNo}`} title="संपादित करा (Edit)">✏️</a>
+                <button class="icon-btn del" data-receipt={d.receiptNo} data-name={d.name} title="हटवा (Delete)">🗑️</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script define:vars={{ donations, settings }}>
+    window.__DON = donations;
+    window.__SET = settings;
+  </script>
+  <script>
+    import { generateReceiptImage, whatsappShareURL } from '../../scripts/receipt.js';
+    const donations = window.__DON;
+    const settings = window.__SET;
+
+    const search = document.getElementById('search');
+    const count = document.getElementById('count');
+    const rows = Array.from(document.querySelectorAll('#tbody tr[data-search]'));
+    let activeFilter = 'all';
+
+    function applyFilters() {
+      const q = search.value.trim().toLowerCase();
+      let visible = 0;
+      rows.forEach((r) => {
+        if (!r.isConnected) return; // skip rows removed via delete
+        const matchSearch = !q || r.dataset.search.includes(q);
+        const matchFilter = activeFilter === 'all' || r.dataset.bucket === activeFilter;
+        const show = matchSearch && matchFilter;
+        r.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+      if (count) count.textContent = visible + ' नोंदी';
+    }
+    function updateCount() { applyFilters(); }
+
+    search?.addEventListener('input', applyFilters);
+
+    document.querySelectorAll('#filterTabs .filter-tab').forEach((tab) =>
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('#filterTabs .filter-tab').forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+        activeFilter = tab.dataset.filter;
+        applyFilters();
+      })
+    );
+
+    document.querySelectorAll('.re-pdf').forEach((b) =>
+      b.addEventListener('click', async () => {
+        await generateReceiptImage(donations[+b.dataset.i], settings);
+        window.showToast?.('पावती डाउनलोड झाली', 'ok');
+      })
+    );
+    document.querySelectorAll('.re-wa').forEach((b) =>
+      b.addEventListener('click', () => {
+        window.open(whatsappShareURL(donations[+b.dataset.i], settings), '_blank');
+      })
+    );
+
+    // Delete with confirmation
+    document.querySelectorAll('.del').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const rn = b.dataset.receipt;
+        const nm = b.dataset.name || '';
+        if (!confirm(`ही देणगी हटवायची? \n${rn} — ${nm}\n\nही क्रिया परत करता येणार नाही.`)) return;
+        b.disabled = true;
+        try {
+          const res = await fetch(`/api/donations/${encodeURIComponent(rn)}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'त्रुटी');
+          document.querySelector(`#tbody tr[data-receipt="${rn}"]`)?.remove();
+          updateCount();
+          window.showToast?.('देणगी हटवली', 'ok');
+        } catch (err) {
+          b.disabled = false;
+          window.showToast?.(err.message || 'त्रुटी आली', 'err');
+        }
+      })
+    );
+  </script>
+</AdminLayout>

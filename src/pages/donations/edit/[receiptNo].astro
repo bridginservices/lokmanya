@@ -1,0 +1,60 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import DonationForm from '../../../components/DonationForm.astro';
+import { getDonation } from '../../../lib/store.js';
+
+const { receiptNo } = Astro.params;
+const donation = getDonation(receiptNo);
+if (!donation) return Astro.redirect('/donations');
+---
+<AdminLayout title="देणगी संपादित करा" active="donations" subtitle={`Edit Donation · पावती क्र. ${donation.receiptNo}`}>
+  <div slot="topbar-actions">
+    <a class="btn btn-ghost" href="/donations">← मागे</a>
+  </div>
+
+  <div class="card" style="max-width:900px">
+    <div style="background:#fff8ee;border-left:4px solid #ff7a00;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13.5px">
+      पावती क्र.: <b style="color:#c1121f">{donation.receiptNo}</b> — ही पावती क्रमांक बदलणार नाही.
+    </div>
+
+    <form id="donationForm" data-receipt={donation.receiptNo}>
+      <DonationForm donation={donation} />
+
+      <div class="actions-row">
+        <button type="submit" class="btn btn-primary btn-lg" id="saveBtn">💾 बदल जतन करा (Save Changes)</button>
+        <a class="btn btn-ghost btn-lg" href="/donations">रद्द करा (Cancel)</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('donationForm');
+    const saveBtn = document.getElementById('saveBtn');
+    const receiptNo = form?.dataset.receipt;
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(form).entries());
+      if (!payload.name?.toString().trim()) return window.showToast?.('नाव आवश्यक आहे', 'err');
+      if (!(Number(payload.totalAmount) > 0)) return window.showToast?.('वैध एकूण रक्कम टाका', 'err');
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = '⏳ जतन करत आहे...';
+      try {
+        const res = await fetch(`/api/donations/${encodeURIComponent(receiptNo)}`, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'त्रुटी आली');
+        window.showToast?.('बदल जतन झाले!', 'ok');
+        setTimeout(() => { location.href = '/donations'; }, 700);
+      } catch (err) {
+        window.showToast?.(err.message || 'त्रुटी आली', 'err');
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 बदल जतन करा (Save Changes)';
+      }
+    });
+  </script>
+</AdminLayout>

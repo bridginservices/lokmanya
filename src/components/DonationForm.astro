@@ -1,0 +1,89 @@
+---
+// Shared donation form for Add (create) and Edit modes.
+// Pass `donation` for edit mode; omit for a blank create form.
+const { donation = null } = Astro.props;
+const d = donation || {};
+const today = new Date().toISOString().slice(0, 10);
+const val = (k, fallback = '') => (d[k] != null && d[k] !== '' ? d[k] : fallback);
+const method = val('paymentMethod', 'Cash');
+---
+<div class="form-grid">
+  <div class="field">
+    <label for="name">देणगीदाराचे नाव <span class="req">*</span> <small>(Donor Name)</small></label>
+    <input id="name" name="name" required placeholder="उदा. श्री. राम शर्मा" class="mr" value={val('name')} />
+  </div>
+  <div class="field">
+    <label for="mobile">मोबाईल क्रमांक <small>(Mobile)</small></label>
+    <input id="mobile" name="mobile" inputmode="numeric" maxlength="15" placeholder="98XXXXXXXX" value={val('mobile')} />
+  </div>
+  <div class="field">
+    <label for="whatsapp">व्हॉट्सअ‍ॅप क्रमांक <small>(WhatsApp)</small></label>
+    <input id="whatsapp" name="whatsapp" inputmode="numeric" maxlength="15" placeholder="मोबाईल प्रमाणेच असल्यास रिकामे" value={val('whatsapp')} />
+  </div>
+  <div class="field">
+    <label for="date">दिनांक <small>(Date)</small></label>
+    <input id="date" name="date" type="date" value={val('date', today)} />
+  </div>
+
+  <div class="field">
+    <label for="totalAmount">एकूण रक्कम (₹) <span class="req">*</span> <small>(Total)</small></label>
+    <input id="totalAmount" name="totalAmount" type="number" min="1" step="1" required placeholder="5000" value={val('totalAmount')} />
+  </div>
+  <div class="field">
+    <label for="paidAmount">भरलेली रक्कम (₹) <small>(Paid · रिकामे = पूर्ण)</small></label>
+    <input id="paidAmount" name="paidAmount" type="number" min="0" step="1" placeholder="भरलेली रक्कम" value={donation ? val('paidAmount') : ''} />
+  </div>
+  <div class="field">
+    <label for="balance">बाकी रक्कम (₹) <small>(Balance · आपोआप)</small></label>
+    <input id="balance" name="balanceView" type="text" readonly value={val('balance', '0')} style="background:#f5efe6;font-weight:700;color:#c1121f" />
+  </div>
+  <div class="field">
+    <label>स्थिती <small>(Status · आपोआप)</small></label>
+    <div style="padding:8px 0"><span id="statusBadge" class="badge paid">पूर्ण (Paid)</span></div>
+  </div>
+
+  <div class="field">
+    <label for="paymentMethod">पेमेंट पद्धत <small>(Payment Method)</small></label>
+    <select id="paymentMethod" name="paymentMethod">
+      <option value="Cash" selected={method === 'Cash'}>रोख (Cash)</option>
+      <option value="UPI" selected={method === 'UPI'}>यूपीआय (UPI)</option>
+      <option value="Bank Transfer" selected={method === 'Bank Transfer'}>बँक ट्रान्सफर (Bank Transfer)</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="transactionId">व्यवहार क्र. <small>(Transaction ID · optional)</small></label>
+    <input id="transactionId" name="transactionId" placeholder="UPI/बँक संदर्भ क्रमांक" value={val('transactionId')} />
+  </div>
+  <div class="field full">
+    <label for="notes">टीप <small>(Notes)</small></label>
+    <textarea id="notes" name="notes" placeholder="अतिरिक्त माहिती (ऐच्छिक)">{val('notes')}</textarea>
+  </div>
+</div>
+
+<script>
+  // Live Balance + Status calculation shared by Add & Edit forms.
+  const totalEl = document.getElementById('totalAmount');
+  const paidEl = document.getElementById('paidAmount');
+  const balEl = document.getElementById('balance');
+  const badge = document.getElementById('statusBadge');
+
+  function recalc() {
+    if (!totalEl) return;
+    const t = Number(totalEl.value) || 0;
+    // Empty paid field means "paid in full".
+    let p = paidEl.value === '' ? t : (Number(paidEl.value) || 0);
+    if (p > t) { p = t; paidEl.value = String(t); }
+    if (p < 0) { p = 0; paidEl.value = '0'; }
+    const bal = Math.max(0, t - p);
+    if (balEl) balEl.value = bal;
+
+    let label = 'बाकी (Pending)', cls = 'pending';
+    if (t > 0 && p >= t) { label = 'पूर्ण (Paid)'; cls = 'paid'; }
+    else if (p > 0 && p < t) { label = 'अंशतः (Partial)'; cls = 'partial'; }
+    if (badge) { badge.textContent = label; badge.className = 'badge ' + cls; }
+  }
+
+  totalEl?.addEventListener('input', recalc);
+  paidEl?.addEventListener('input', recalc);
+  recalc();
+</script>

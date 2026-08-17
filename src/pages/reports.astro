@@ -1,0 +1,41 @@
+---
+import AdminLayout from '../layouts/AdminLayout.astro';
+import { getStats } from '../lib/store.js';
+
+const stats = getStats();
+const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
+---
+<AdminLayout title="अहवाल" active="reports" subtitle="Reports · संकलनाचा सारांश">
+  <div slot="topbar-actions">
+    <a class="btn btn-primary" href="/api/export">📥 Excel डाउनलोड करा</a>
+  </div>
+
+  <div class="grid stats">
+    <div class="stat">
+      <div class="ic">📅</div>
+      <div class="label mr">आजचे संकलन (Today's Collection)</div>
+      <div class="value">{inr(stats.todayTotal)}</div>
+    </div>
+    <div class="stat gold">
+      <div class="ic">📆</div>
+      <div class="label mr">मासिक संकलन (Monthly Collection)</div>
+      <div class="value">{inr(stats.monthTotal)}</div>
+    </div>
+    <div class="stat red">
+      <div class="ic">💰</div>
+      <div class="label mr">एकूण संकलन (Total Collection)</div>
+      <div class="value">{inr(stats.total)}</div>
+    </div>
+    <div class="stat green">
+      <div class="ic">👥</div>
+      <div class="label mr">एकूण देणगीदार (Total Donors)</div>
+      <div class="value">{stats.donorCount}</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:22px;max-width:640px">
+    <div class="card-head"><h2 class="mr">📥 Excel डाउनलोड (Download Excel)</h2></div>
+    <p class="hint" style="margin-top:0">सर्व देणग्यांची नोंद Microsoft Excel (.xlsx) मध्ये डाउनलोड करा.</p>
+    <a class="btn btn-primary btn-lg" href="/api/export">📥 Excel डाउनलोड करा</a>
+  </div>
+</AdminLayout>

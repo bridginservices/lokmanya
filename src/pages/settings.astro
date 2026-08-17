@@ -1,0 +1,96 @@
+---
+import AdminLayout from '../layouts/AdminLayout.astro';
+import { publicSettings } from '../lib/settings.js';
+const s = publicSettings();
+---
+<AdminLayout title="सेटिंग्ज" active="settings" subtitle="Settings · मंडळाची माहिती व पावती तपशील">
+  <form id="settingsForm" class="card" style="max-width:860px">
+    <div class="section-title mr">🏛️ मंडळ माहिती (Mandal Details)</div>
+    <div class="form-grid">
+      <div class="field full">
+        <label>मंडळाचे नाव (Mandal Name) <span class="req">*</span></label>
+        <input name="mandalName" class="mr" value={s.mandalName} required />
+      </div>
+      <div class="field full">
+        <label>पत्ता (Address)</label>
+        <input name="address" class="mr" value={s.address} />
+      </div>
+      <div class="field">
+        <label>संपर्क क्रमांक (Contact Number)</label>
+        <input name="contact" value={s.contact} />
+      </div>
+      <div class="field">
+        <label>लोगो (Logo) <small>PNG/JPG/WEBP/SVG · कमाल 2MB</small></label>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div class="login-logo" style="width:56px;height:56px;margin:0;font-size:26px">
+            {s.logo ? <img id="logoPrev" src={s.logo} alt="logo" /> : <span id="logoPrev">🕉️</span>}
+          </div>
+          <input type="file" name="logo" id="logoInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="border:none;padding:0" />
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title mr">🧾 पावती मजकूर (Receipt Text)</div>
+    <div class="form-grid">
+      <div class="field full">
+        <label>धन्यवाद संदेश (Thank You Message)</label>
+        <textarea name="thankYou" class="mr">{s.thankYou}</textarea>
+      </div>
+      <div class="field">
+        <label>अधिकृत स्वाक्षरीकर्ता (Authorized Signatory)</label>
+        <input name="signatory" class="mr" value={s.signatory} />
+      </div>
+    </div>
+
+    <div class="section-title mr">🔒 पासवर्ड बदला (Change Password)</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>सध्याचा पासवर्ड (Current Password)</label>
+        <input type="password" name="currentPassword" autocomplete="current-password" placeholder="बदलायचा असल्यासच भरा" />
+      </div>
+      <div class="field">
+        <label>नवीन पासवर्ड (New Password)</label>
+        <input type="password" name="newPassword" autocomplete="new-password" placeholder="किमान 6 अक्षरे" />
+      </div>
+    </div>
+
+    <div class="actions-row" style="margin-top:20px">
+      <button type="submit" class="btn btn-primary btn-lg" id="saveBtn">💾 जतन करा (Save Settings)</button>
+    </div>
+  </form>
+
+  <script>
+    const form = document.getElementById('settingsForm');
+    const saveBtn = document.getElementById('saveBtn');
+
+    // Live logo preview
+    document.getElementById('logoInput')?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const prev = document.getElementById('logoPrev');
+      if (prev.tagName === 'IMG') { prev.src = url; }
+      else { const img = document.createElement('img'); img.id = 'logoPrev'; img.src = url; prev.replaceWith(img); }
+    });
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      saveBtn.disabled = true;
+      saveBtn.textContent = '⏳ जतन करत आहे...';
+      try {
+        const res = await fetch('/api/settings', { method: 'POST', body: new FormData(form) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'त्रुटी आली');
+        window.showToast?.('सेटिंग्ज जतन झाल्या!', 'ok');
+        form.querySelector('[name=currentPassword]').value = '';
+        form.querySelector('[name=newPassword]').value = '';
+        setTimeout(() => location.reload(), 900);
+      } catch (err) {
+        window.showToast?.(err.message || 'त्रुटी आली', 'err');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 जतन करा (Save Settings)';
+      }
+    });
+  </script>
+</AdminLayout>

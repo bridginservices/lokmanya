@@ -1,0 +1,106 @@
+---
+import '../styles/global.css';
+import { publicSettings } from '../lib/settings.js';
+
+const { title = 'डॅशबोर्ड', active = 'home', subtitle = '' } = Astro.props;
+const settings = publicSettings();
+
+const nav = [
+  { key: 'home', href: '/', ic: '🏠', label: 'डॅशबोर्ड', sub: 'Dashboard' },
+  { key: 'new', href: '/donations/new', ic: '➕', label: 'नवीन देणगी', sub: 'Add Donation' },
+  { key: 'donations', href: '/donations', ic: '📋', label: 'देणग्या', sub: 'Donations' },
+  { key: 'reports', href: '/reports', ic: '📊', label: 'अहवाल', sub: 'Reports' },
+  { key: 'settings', href: '/settings', ic: '⚙️', label: 'सेटिंग्ज', sub: 'Settings' },
+];
+---
+<!doctype html>
+<html lang="mr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title} · {settings.mandalNameEn}</title>
+  <meta name="theme-color" content="#c1121f" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕉️</text></svg>" />
+</head>
+<body>
+  <div class="app">
+    <div class="backdrop" id="backdrop"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="logo">
+          {settings.logo ? <img src={settings.logo} alt="logo" /> : '🕉️'}
+        </div>
+        <div>
+          <div class="title mr">{settings.mandalName}</div>
+          <div class="subtitle">{settings.mandalNameEn}</div>
+        </div>
+      </div>
+      <nav class="nav">
+        {nav.map((n) => (
+          <a href={n.href} class={active === n.key ? 'active' : ''}>
+            <span class="ic">{n.ic}</span>
+            <span>
+              <span class="mr">{n.label}</span>
+              <small style="display:block;font-size:11px;opacity:.7;font-weight:500">{n.sub}</small>
+            </span>
+          </a>
+        ))}
+      </nav>
+      <div class="sidebar-foot">
+        <button class="logout-btn" id="logoutBtn">🔒 लॉग आउट (Logout)</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="mobile-head">
+        <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+        <div class="mh-title mr">{settings.mandalName}</div>
+      </div>
+
+      <div class="topbar">
+        <div>
+          <div class="page-title mr">{title}</div>
+          {subtitle && <div class="page-sub">{subtitle}</div>}
+        </div>
+        <slot name="topbar-actions" />
+      </div>
+
+      <slot />
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('backdrop');
+    document.getElementById('hamburger')?.addEventListener('click', () => {
+      sidebar?.classList.toggle('open');
+      backdrop?.classList.toggle('show');
+    });
+    backdrop?.addEventListener('click', () => {
+      sidebar?.classList.remove('open');
+      backdrop?.classList.remove('show');
+    });
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+      await fetch('/api/logout', { method: 'POST' });
+      location.href = '/login';
+    });
+
+    // Global toast helper
+    window.showToast = (msg, type = 'ok') => {
+      const t = document.getElementById('toast');
+      if (!t) return;
+      t.textContent = msg;
+      t.className = 'toast show ' + type;
+      setTimeout(() => { t.className = 'toast ' + type; }, 3200);
+    };
+  </script>
+</body>
+</html>

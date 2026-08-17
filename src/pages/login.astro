@@ -1,0 +1,65 @@
+---
+import '../styles/global.css';
+import { publicSettings } from '../lib/settings.js';
+const settings = publicSettings();
+---
+<!doctype html>
+<html lang="mr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>लॉगिन · {settings.mandalNameEn}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕉️</text></svg>" />
+</head>
+<body>
+  <div class="login-wrap">
+    <form class="login-card" id="loginForm">
+      <div class="login-logo">
+        {settings.logo ? <img src={settings.logo} alt="logo" /> : '🕉️'}
+      </div>
+      <h1 class="mr">{settings.mandalName}</h1>
+      <div class="sub">{settings.mandalNameEn} · Admin</div>
+
+      <div class="err-msg" id="errMsg" style="display:none"></div>
+
+      <div class="field">
+        <label for="user">वापरकर्ता (Username)</label>
+        <input id="user" name="user" autocomplete="username" value="admin" required />
+      </div>
+      <div class="field">
+        <label for="password">पासवर्ड (Password)</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <button class="btn btn-primary btn-lg" style="width:100%" type="submit">🔓 लॉगिन करा</button>
+      <div class="login-note">डीफॉल्ट: <b>admin / admin123</b> — लॉगिननंतर सेटिंग्जमध्ये बदला.</div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const err = document.getElementById('errMsg');
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.style.display = 'none';
+      const body = {
+        user: (document.getElementById('user') as HTMLInputElement).value,
+        password: (document.getElementById('password') as HTMLInputElement).value,
+      };
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        location.href = '/';
+      } else {
+        err.textContent = '❌ चुकीचा वापरकर्ता किंवा पासवर्ड (Invalid credentials)';
+        err.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

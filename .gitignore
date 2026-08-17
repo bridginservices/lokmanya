@@ -1,0 +1,15 @@
+# build output
+dist/
+.astro/
+
+# dependencies
+node_modules/
+
+# app data (donations, settings, secrets, uploaded logo)
+data/
+!data/.gitkeep
+
+# logs & env
+*.log
+.env
+.DS_Store

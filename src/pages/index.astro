@@ -1,0 +1,127 @@
+---
+import AdminLayout from '../layouts/AdminLayout.astro';
+import { getStats, getDonations } from '../lib/store.js';
+import { publicSettings } from '../lib/settings.js';
+
+const stats = getStats();
+const donations = getDonations();
+const recent = donations.slice(0, 8);
+const settings = publicSettings();
+
+const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
+const payClass = (m) => (m === 'UPI' ? 'upi' : m === 'Bank Transfer' ? 'bank' : 'cash');
+const payMr = { Cash: 'रोख', UPI: 'यूपीआय', 'Bank Transfer': 'बँक' };
+const statusClass = (s) => (s === 'Paid' ? 'paid' : s === 'Partial' ? 'partial' : 'pending');
+const statusMr = { Paid: 'पूर्ण', Partial: 'अंशतः', Pending: 'बाकी' };
+const fmtDate = (d) => { try { return new Date(d).toLocaleDateString('en-GB'); } catch { return d; } };
+---
+<AdminLayout title="डॅशबोर्ड" active="home" subtitle="Dashboard · आजची स्थिती एका दृष्टीक्षेपात">
+  <div class="grid stats">
+    <div class="stat">
+      <div class="ic">📅</div>
+      <div class="label mr">आजची एकूण देणगी (Today's Donations)</div>
+      <div class="value">{inr(stats.todayTotal)}</div>
+      <div class="meta">{stats.todayCount} देणग्या आज</div>
+    </div>
+    <div class="stat red">
+      <div class="ic">💰</div>
+      <div class="label mr">एकूण जमा देणगी (Total Received)</div>
+      <div class="value">{inr(stats.total)}</div>
+      <div class="meta">{stats.count} एकूण पावत्या</div>
+    </div>
+    <div class="stat green">
+      <div class="ic">👥</div>
+      <div class="label mr">एकूण देणगीदार (Total Donors)</div>
+      <div class="value">{stats.donorCount}</div>
+      <div class="meta">अद्वितीय देणगीदार</div>
+    </div>
+    <div class="stat gold">
+      <div class="ic">⏳</div>
+      <div class="label mr">येणे बाकी रक्कम (Amount to be Received)</div>
+      <div class="value">{inr(stats.outstanding)}</div>
+      <div class="meta">
+        {stats.outstanding > 0
+          ? 'देणगीदारांकडून येणे बाकी'
+          : 'सर्व रक्कम जमा झाली ✓'}
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">⚡ जलद क्रिया (Quick Actions)</div>
+  <div class="grid quick">
+    <a class="quick-btn" href="/donations/new">
+      <span class="qic a">➕</span>
+      <span>नवीन देणगी<small>Add New Donation</small></span>
+    </a>
+    <a class="quick-btn" href="/donations">
+      <span class="qic b">📋</span>
+      <span>देणग्या पहा<small>View Donations</small></span>
+    </a>
+    <a class="quick-btn" href="/api/export">
+      <span class="qic c">📥</span>
+      <span>Excel डाउनलोड<small>Download Excel</small></span>
+    </a>
+    <button class="quick-btn" id="dlReceiptsBtn" type="button">
+      <span class="qic d">🧾</span>
+      <span>पावत्या डाउनलोड<small>Download Receipts</small></span>
+    </button>
+  </div>
+
+  <div class="card" style="margin-top:22px">
+    <div class="card-head">
+      <h2 class="mr">🧾 अलीकडील देणग्या (Recent Donations)</h2>
+      <a class="btn btn-ghost" href="/donations" style="padding:8px 16px;font-size:13.5px">सर्व पहा →</a>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>पावती क्र.</th><th>नाव</th><th>मोबाईल</th><th>एकूण</th><th>भरले</th><th>बाकी</th><th>स्थिती</th><th>दिनांक</th>
+          </tr>
+        </thead>
+        <tbody>
+          {recent.length === 0 && (
+            <tr><td colspan="8" class="empty">अजून कोणतीही देणगी नोंदवलेली नाही. <a href="/donations/new">पहिली देणगी जोडा →</a></td></tr>
+          )}
+          {recent.map((d) => (
+            <tr>
+              <td><b>{d.receiptNo}</b></td>
+              <td class="mr">{d.name}</td>
+              <td>{d.mobile}</td>
+              <td class="amount">{inr(d.totalAmount)}</td>
+              <td>{inr(d.paidAmount)}</td>
+              <td style={Number(d.balance) > 0 ? 'color:#c1121f;font-weight:700' : ''}>{inr(d.balance)}</td>
+              <td><span class={'badge ' + statusClass(d.status)}>{statusMr[d.status] || d.status}</span></td>
+              <td>{fmtDate(d.date)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script define:vars={{ donations, settings }}>
+    window.__ALL_DON = donations;
+    window.__SET = settings;
+  </script>
+  <script>
+    import { generateAllReceiptsPDF } from '../scripts/receipt.js';
+    const btn = document.getElementById('dlReceiptsBtn');
+    btn?.addEventListener('click', async () => {
+      const donations = window.__ALL_DON || [];
+      if (donations.length === 0) return window.showToast?.('अजून कोणतीही पावती नाही', 'err');
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.querySelector('span:last-child').innerHTML = 'तयार करत आहे...<small>Please wait</small>';
+      try {
+        await generateAllReceiptsPDF(donations, window.__SET);
+        window.showToast?.('सर्व पावत्या डाउनलोड झाल्या!', 'ok');
+      } catch (e) {
+        window.showToast?.('त्रुटी आली', 'err');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
+  </script>
+</AdminLayout>

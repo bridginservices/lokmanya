@@ -1,0 +1,82 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import DonationForm from '../../components/DonationForm.astro';
+---
+<AdminLayout title="नवीन देणगी" active="new" subtitle="Add Donation · देणगीची नोंद करा व पावती तयार करा">
+  <div class="card" style="max-width:900px">
+    <form id="donationForm">
+      <DonationForm />
+
+      <div class="actions-row">
+        <button type="submit" class="btn btn-primary btn-lg" id="genBtn">🧾 पावती तयार करा (Generate Receipt)</button>
+        <button type="reset" class="btn btn-ghost btn-lg">↺ रिकामे करा</button>
+      </div>
+    </form>
+
+    <div id="resultBox" style="display:none;margin-top:22px;padding:20px;border:1.5px solid #f4b400;border-radius:14px;background:linear-gradient(90deg,#fff8ee,#ffe9b8)">
+      <div style="font-weight:800;font-size:16px;color:#256d2a">✅ देणगी यशस्वीरित्या नोंदवली!</div>
+      <div style="margin-top:6px;font-size:14px">पावती क्र.: <b id="rReceipt" style="color:#c1121f"></b> — JPG डाउनलोड झाली आहे.</div>
+      <div class="actions-row" style="margin-top:14px">
+        <button class="btn btn-green" id="shareBtn">📲 व्हॉट्सअ‍ॅपवर पाठवा (Share Receipt)</button>
+        <button class="btn btn-ghost" id="redownloadBtn">⬇️ पुन्हा डाउनलोड</button>
+        <a class="btn btn-ghost" href="/donations/new">➕ आणखी एक देणगी</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { generateReceiptImage, whatsappShareURL } from '../../scripts/receipt.js';
+
+    const form = document.getElementById('donationForm');
+    const genBtn = document.getElementById('genBtn');
+    const resultBox = document.getElementById('resultBox');
+    let lastDonation = null;
+    let lastSettings = null;
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const payload = Object.fromEntries(fd.entries());
+
+      if (!payload.name?.toString().trim()) return window.showToast?.('नाव आवश्यक आहे', 'err');
+      if (!(Number(payload.totalAmount) > 0)) return window.showToast?.('वैध एकूण रक्कम टाका', 'err');
+
+      genBtn.disabled = true;
+      genBtn.textContent = '⏳ जतन करत आहे...';
+      try {
+        const res = await fetch('/api/donations', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'त्रुटी आली');
+
+        lastDonation = data.donation;
+        lastSettings = data.settings;
+
+        genBtn.textContent = '⏳ पावती तयार करत आहे...';
+        await generateReceiptImage(lastDonation, lastSettings);
+
+        document.getElementById('rReceipt').textContent = lastDonation.receiptNo;
+        resultBox.style.display = 'block';
+        resultBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        window.showToast?.('पावती तयार व डाउनलोड झाली!', 'ok');
+      } catch (err) {
+        window.showToast?.(err.message || 'त्रुटी आली', 'err');
+      } finally {
+        genBtn.disabled = false;
+        genBtn.textContent = '🧾 पावती तयार करा (Generate Receipt)';
+      }
+    });
+
+    document.getElementById('shareBtn')?.addEventListener('click', () => {
+      if (!lastDonation) return;
+      window.open(whatsappShareURL(lastDonation, lastSettings), '_blank');
+    });
+    document.getElementById('redownloadBtn')?.addEventListener('click', async () => {
+      if (!lastDonation) return;
+      await generateReceiptImage(lastDonation, lastSettings);
+    });
+  </script>
+</AdminLayout>
