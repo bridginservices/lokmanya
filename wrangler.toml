@@ -8,11 +8,12 @@ compatibility_flags = ["nodejs_compat"]
 binding = "ASSETS"
 directory = "./dist"
 
-# R2 bucket that holds donations.xlsx, settings.json and the uploaded logo.
-# Create it once:  wrangler r2 bucket create lokmanya-data
-[[r2_buckets]]
+# KV namespace that holds donations.xlsx, settings.json and the uploaded logo.
+# Create it once:  npx wrangler kv namespace create DATA
+# then paste the printed id below (replacing REPLACE_WITH_KV_ID).
+[[kv_namespaces]]
 binding = "DATA"
-bucket_name = "lokmanya-data"
+id = "REPLACE_WITH_KV_ID"
 
 # SESSION_SECRET is a secret — set it in the dashboard (Variables and Secrets)
 # or with:  wrangler secret put SESSION_SECRET

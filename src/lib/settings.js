@@ -1,4 +1,5 @@
 import { hashPassword } from './auth.js';
+import { readText, writeValue } from './storage.js';
 
 // Re-export so callers can keep importing hashing from settings if they wish.
 export { hashPassword, verifyPassword } from './auth.js';
@@ -21,10 +22,10 @@ const DEFAULTS = {
 
 export async function getSettings(env) {
   let data = {};
-  const obj = await env.DATA.get(SETTINGS_KEY);
-  if (obj) {
+  const txt = await readText(env, SETTINGS_KEY);
+  if (txt) {
     try {
-      data = JSON.parse(await obj.text());
+      data = JSON.parse(txt);
     } catch {
       data = {};
     }
@@ -33,7 +34,7 @@ export async function getSettings(env) {
   // Seed a default admin password on first run.
   if (!merged.adminHash) {
     merged.adminHash = await hashPassword('admin123');
-    await env.DATA.put(SETTINGS_KEY, JSON.stringify(merged, null, 2));
+    await writeValue(env, SETTINGS_KEY, JSON.stringify(merged, null, 2));
   }
   return merged;
 }
@@ -41,7 +42,7 @@ export async function getSettings(env) {
 export async function saveSettings(env, patch) {
   const current = await getSettings(env);
   const next = { ...current, ...patch };
-  await env.DATA.put(SETTINGS_KEY, JSON.stringify(next, null, 2));
+  await writeValue(env, SETTINGS_KEY, JSON.stringify(next, null, 2));
   return next;
 }
 

@@ -1,4 +1,5 @@
 import { saveSettings, getSettings, hashPassword, verifyPassword } from '../../lib/settings.js';
+import { writeValue } from '../../lib/storage.js';
 
 export const prerender = false;
 
@@ -28,7 +29,7 @@ export async function POST({ request, locals }) {
     if (logo.size > 2 * 1024 * 1024) return json({ error: 'लोगो 2MB पेक्षा लहान असावा' }, 422);
     const buf = new Uint8Array(await logo.arrayBuffer());
     const fname = `logo${ext}`;
-    await env.DATA.put(`uploads/${fname}`, buf, { httpMetadata: { contentType: logo.type } });
+    await writeValue(env, `uploads/${fname}`, buf, { contentType: logo.type });
     patch.logo = `/uploads/${fname}?v=${Date.now()}`;
   }
 

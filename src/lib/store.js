@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { getSettings } from './settings.js';
+import { readBytes, writeValue } from './storage.js';
 
 const DONATIONS_KEY = 'donations.xlsx';
 const SHEET_NAME = 'Donations';
@@ -40,9 +41,9 @@ function migrateLegacy(rec) {
 }
 
 async function readWorkbook(env) {
-  const obj = await env.DATA.get(DONATIONS_KEY);
-  if (!obj) return [];
-  const buf = new Uint8Array(await obj.arrayBuffer());
+  const ab = await readBytes(env, DONATIONS_KEY);
+  if (!ab) return [];
+  const buf = new Uint8Array(ab);
   const wb = XLSX.read(buf, { type: 'array' });
   const ws = wb.Sheets[SHEET_NAME] || wb.Sheets[wb.SheetNames[0]];
   if (!ws) return [];
@@ -74,7 +75,7 @@ function buildWorkbookBytes(records) {
 }
 
 async function writeWorkbook(env, records) {
-  await env.DATA.put(DONATIONS_KEY, buildWorkbookBytes(records));
+  await writeValue(env, DONATIONS_KEY, buildWorkbookBytes(records));
 }
 
 // Payment status derived from total vs paid.
@@ -221,8 +222,8 @@ export async function getStats(env) {
 }
 
 export async function getWorkbookBuffer(env) {
-  const obj = await env.DATA.get(DONATIONS_KEY);
-  if (obj) return await obj.arrayBuffer();
+  const ab = await readBytes(env, DONATIONS_KEY);
+  if (ab) return ab;
   // Empty-but-valid workbook with just the headers.
   return buildWorkbookBytes([]);
 }
