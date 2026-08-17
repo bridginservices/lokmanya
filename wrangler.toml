@@ -1,14 +1,18 @@
 name = "lokmanya"
-pages_build_output_dir = "./dist"
+main = "./dist/_worker.js/index.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Serve Astro's static assets. `.assetsignore` (in dist) keeps _worker.js private.
+[assets]
+binding = "ASSETS"
+directory = "./dist"
+
 # R2 bucket that holds donations.xlsx, settings.json and the uploaded logo.
-# Create it once with:  wrangler r2 bucket create lokmanya-data
+# Create it once:  wrangler r2 bucket create lokmanya-data
 [[r2_buckets]]
 binding = "DATA"
 bucket_name = "lokmanya-data"
 
-# SESSION_SECRET is a secret, not a plain var. Set it for production with:
-#   wrangler pages secret put SESSION_SECRET
-# For local dev (`npm run dev`) it is read from .dev.vars instead.
+# SESSION_SECRET is a secret — set it in the dashboard (Variables and Secrets)
+# or with:  wrangler secret put SESSION_SECRET
